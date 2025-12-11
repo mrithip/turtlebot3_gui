@@ -2,6 +2,11 @@
 import sys
 import rclpy
 from rclpy.node import Node
+import cv2
+from cv_bridge import CvBridge
+from sensor_msgs.msg import CompressedImage
+from PyQt5.QtGui import QImage, QPixmap
+import numpy as np
 from nav_msgs.msg import Odometry
 from PyQt5.QtWidgets import QApplication, QLabel, QWidget, QVBoxLayout, QPushButton, QHBoxLayout, QSlider
 from PyQt5.QtCore import QTimer, Qt
@@ -22,6 +27,15 @@ class RobotGuiNode(Node):
         self.angular_velocity = 0.0
         self.trajectory = []  # store (x, y) positions
 
+        self.bridge = CvBridge()
+        self.latest_image = None
+        self.sub_camera = self.create_subscription(
+            CompressedImage,
+            '/camera/image_raw/compressed',
+            self.camera_callback,
+            10
+        )
+
     def odom_callback(self, msg):
         self.x = msg.pose.pose.position.x
         self.y = msg.pose.pose.position.y
@@ -37,6 +51,15 @@ class RobotGuiNode(Node):
 
     def stop(self):
         self.move(0.0, 0.0)
+
+    def camera_callback(self, msg):
+        try:
+            # Decode compressed image to OpenCV format
+            np_arr = np.frombuffer(msg.data, np.uint8)
+            self.latest_image = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+        except Exception as e:
+            self.get_logger().error(f"Camera error: {e}")
+
 
 class GuiWindow(QWidget):
     def __init__(self, node):
@@ -98,12 +121,130 @@ class GuiWindow(QWidget):
         # -------------------------
         self.label = QLabel("Odom: x=0.0, y=0.0")
 
-        self.button_forward = QPushButton("Forward")
-        self.button_backward = QPushButton("Backward")
-        self.button_left = QPushButton("Left")
-        self.button_right = QPushButton("Right")
-        self.button_stop = QPushButton("Stop")
+        self.button_forward = QPushButton("↑")
+        self.button_forward.setFixedSize(70, 50)
+        self.button_forward.setStyleSheet("""
+            QPushButton {
+                background-color: #2C3E50;
+                border: 2px solid #34495E;
+                color: white;
+                font-size: 20px;
+                font-weight: bold;
+                border-radius: 8px;
+            }
+            QPushButton:hover {
+                background-color: #34495E;
+                border: 2px solid #2980B9;
+            }
+            QPushButton:pressed {
+                background-color: #1A252F;
+                border: 2px solid #2980B9;
+            }
+        """)
+
+        self.button_backward = QPushButton("↓")
+        self.button_backward.setFixedSize(70, 50)
+        self.button_backward.setStyleSheet("""
+            QPushButton {
+                background-color: #2C3E50;
+                border: 2px solid #34495E;
+                color: white;
+                font-size: 20px;
+                font-weight: bold;
+                border-radius: 8px;
+            }
+            QPushButton:hover {
+                background-color: #34495E;
+                border: 2px solid #E74C3C;
+            }
+            QPushButton:pressed {
+                background-color: #1A252F;
+                border: 2px solid #E74C3C;
+            }
+        """)
+
+        self.button_left = QPushButton("←")
+        self.button_left.setFixedSize(70, 50)
+        self.button_left.setStyleSheet("""
+            QPushButton {
+                background-color: #2C3E50;
+                border: 2px solid #34495E;
+                color: white;
+                font-size: 20px;
+                font-weight: bold;
+                border-radius: 8px;
+            }
+            QPushButton:hover {
+                background-color: #34495E;
+                border: 2px solid #F39C12;
+            }
+            QPushButton:pressed {
+                background-color: #1A252F;
+                border: 2px solid #F39C12;
+            }
+        """)
+
+        self.button_right = QPushButton("→")
+        self.button_right.setFixedSize(70, 50)
+        self.button_right.setStyleSheet("""
+            QPushButton {
+                background-color: #2C3E50;
+                border: 2px solid #34495E;
+                color: white;
+                font-size: 20px;
+                font-weight: bold;
+                border-radius: 8px;
+            }
+            QPushButton:hover {
+                background-color: #34495E;
+                border: 2px solid #27AE60;
+            }
+            QPushButton:pressed {
+                background-color: #1A252F;
+                border: 2px solid #27AE60;
+            }
+        """)
+
+        self.button_stop = QPushButton("STOP")
+        self.button_stop.setFixedSize(100, 50)
+        self.button_stop.setStyleSheet("""
+            QPushButton {
+                background-color: #E74C3C;
+                border: 2px solid #C0392B;
+                color: white;
+                font-size: 14px;
+                font-weight: bold;
+                border-radius: 8px;
+            }
+            QPushButton:hover {
+                background-color: #C0392B;
+                border: 2px solid #A93226;
+            }
+            QPushButton:pressed {
+                background-color: #922B21;
+                border: 2px solid #A93226;
+            }
+        """)
         self.button_clear_traj = QPushButton("Clear Trajectory")
+        self.button_clear_traj.setFixedSize(150, 40)
+        self.button_clear_traj.setStyleSheet("""
+            QPushButton {
+                background-color: #34495E;
+                border: 2px solid #2C3E50;
+                color: white;
+                font-size: 12px;
+                font-weight: bold;
+                border-radius: 6px;
+            }
+            QPushButton:hover {
+                background-color: #2C3E50;
+                border: 2px solid #2980B9;
+            }
+            QPushButton:pressed {
+                background-color: #1A252F;
+                border: 2px solid #2980B9;
+            }
+        """)
 
         # Connect buttons
         # Forward button
@@ -135,31 +276,42 @@ class GuiWindow(QWidget):
         self.slider_angular.setTickPosition(QSlider.TicksBelow)
 
         # -------------------------
-        # Layout for buttons and sliders
+        # Control buttons layout (arrow keys style)
         # -------------------------
-        h_layout = QHBoxLayout()
-        h_layout.addWidget(self.button_left)
-        h_layout.addWidget(self.button_forward)
-        h_layout.addWidget(self.button_stop)
-        h_layout.addWidget(self.button_backward)
-        h_layout.addWidget(self.button_right)
-        h_layout.addWidget(self.button_clear_traj)
-        h_layout.addWidget(QLabel("Linear Speed"))
-        h_layout.addWidget(self.slider_linear)
-        h_layout.addWidget(QLabel("Angular Speed"))
-        h_layout.addWidget(self.slider_angular)
+        control_layout = QHBoxLayout()
+        control_layout.addStretch()  # Push buttons to center
+        control_layout.addWidget(self.button_left)
+        control_layout.addWidget(self.button_forward)
+        control_layout.addWidget(self.button_stop)
+        control_layout.addWidget(self.button_backward)
+        control_layout.addWidget(self.button_right)
+        control_layout.addStretch()  # Push buttons to center
 
-        # Main vertical layout
-        layout = QVBoxLayout()
-        layout.addWidget(self.label)
-        layout.addLayout(h_layout)
+        # -------------------------
+        # Sliders layout
+        # -------------------------
+        sliders_layout = QVBoxLayout()
+        linear_layout = QHBoxLayout()
+        linear_layout.addWidget(QLabel("Linear Speed"))
+        linear_layout.addWidget(self.slider_linear)
+        sliders_layout.addLayout(linear_layout)
+
+        angular_layout = QHBoxLayout()
+        angular_layout.addWidget(QLabel("Angular Speed"))
+        angular_layout.addWidget(self.slider_angular)
+        sliders_layout.addLayout(angular_layout)
+
+        # Bottom control section
+        bottom_layout = QVBoxLayout()
+        bottom_layout.addLayout(control_layout)
+        bottom_layout.addLayout(sliders_layout)
+        bottom_layout.addWidget(self.button_clear_traj, alignment=Qt.AlignCenter)
 
         # -------------------------
         # 3️⃣ Velocity graph
         # -------------------------
         self.figure = Figure(figsize=(5,3))
         self.canvas = FigureCanvas(self.figure)
-        layout.addWidget(self.canvas)
 
         self.ax = self.figure.add_subplot(111)
         self.ax.set_title("Robot Velocity")
@@ -177,7 +329,6 @@ class GuiWindow(QWidget):
         # -------------------------
         self.figure_traj = Figure(figsize=(5,5))
         self.canvas_traj = FigureCanvas(self.figure_traj)
-        layout.addWidget(self.canvas_traj)
 
         self.ax_traj = self.figure_traj.add_subplot(111)
         self.ax_traj.set_title("Robot Trajectory")
@@ -187,6 +338,43 @@ class GuiWindow(QWidget):
         self.ax_traj.grid(True)
         self.ax_traj.set_xlim(-10, 10)
         self.ax_traj.set_ylim(-10, 10)
+
+        # -------------------------
+        # Left column: Velocity + Trajectory plots
+        # -------------------------
+        left_column = QVBoxLayout()
+        left_column.addWidget(self.canvas)      # Velocity plot
+        left_column.addWidget(self.canvas_traj) # Trajectory plot
+
+        # -------------------------
+        # 6️⃣ Camera View (Right column)
+        # -------------------------
+        self.camera_label = QLabel("Camera Feed")
+        self.camera_label.setAlignment(Qt.AlignCenter)
+        self.camera_label.setStyleSheet("font-size: 18px; margin: 10px;")
+
+        self.camera_view = QLabel()
+        self.camera_view.setFixedSize(640, 480)
+        self.camera_view.setStyleSheet("background-color: black; border-radius: 10px;")
+
+        right_column = QVBoxLayout()
+        right_column.addWidget(self.camera_label)
+        right_column.addWidget(self.camera_view, alignment=Qt.AlignCenter)
+
+        # -------------------------
+        # Two-column layout
+        # -------------------------
+        columns_layout = QHBoxLayout()
+        columns_layout.addLayout(left_column)
+        columns_layout.addLayout(right_column)
+
+        # -------------------------
+        # Main layout
+        # -------------------------
+        layout = QVBoxLayout()
+        layout.addWidget(self.label, alignment=Qt.AlignCenter)  # Header: Odom label
+        layout.addLayout(columns_layout)  # Two-column section
+        layout.addLayout(bottom_layout)   # Bottom controls
 
         # -------------------------
         # 5️⃣ Timer to update GUI
@@ -233,6 +421,24 @@ class GuiWindow(QWidget):
         # linear = self.slider_linear.value() / 100.0
         # angular = self.slider_angular.value() / 100.0
         # self.node.move(linear_x=linear, angular_z=angular)
+
+        # Update camera view
+        if self.node.latest_image is not None:
+            frame = cv2.cvtColor(self.node.latest_image, cv2.COLOR_BGR2RGB)
+
+            h, w, ch = frame.shape
+            bytes_per_line = ch * w
+            qt_image = QImage(frame.data, w, h, bytes_per_line, QImage.Format_RGB888)
+
+            pixmap = QPixmap.fromImage(qt_image)
+            pixmap = pixmap.scaled(
+                self.camera_view.width(),
+                self.camera_view.height(),
+                Qt.KeepAspectRatio,
+                Qt.SmoothTransformation
+            )
+
+            self.camera_view.setPixmap(pixmap)
 
     def clear_trajectory(self):
         self.node.trajectory = []
