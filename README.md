@@ -177,9 +177,10 @@ This project is licensed under the [LICENSE] - see the LICENSE file for details.
 
 ## Acknowledgments
 
-- Built for TurtleBot3 platform
+- Built for TurtleBot3 and MOB Bot
 - Uses ROS2 for robot communication
 - PyQt5 for Python GUI development
 - Matplotlib for data visualization
+- Integrated with [MOB Bot](https://github.com/mrithip/mob_bot) for mobile robotics
 
 **Note**: This project is designed for ROS2 and TurtleBot3. Make sure you have the appropriate TurtleBot3 packages installed before running.
