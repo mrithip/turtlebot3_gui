@@ -92,6 +92,8 @@ The GUI features a professional three-section layout:
 
 ## GUI Controls
 
+<video src="https://github.com/user-attachments/assets/737dffc2-8fa4-4e8a-90cb-48524c12eab4" width="100%" controls autoplay muted loop></video>
+
 ### Movement Controls
 - **↑ (Forward)**: Move robot forward at selected linear speed
 - **↓ (Backward)**: Move robot backward at selected linear speed
